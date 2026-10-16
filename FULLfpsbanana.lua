@@ -1,6 +1,7 @@
 --// ============================================================
---  leakD Hub X Banana [BloxFruit]
+--  Banana Cat HUB [BLOX FRUITS] premium script
 --  Tema fixo: Banana  |  Tradução PT/EN  |  Webhook System
+--  Crash Webhook com @everyone
 -- ============================================================
 
 local HUB_NAME   = "Banana Cat HUB [BLOX FRUITS] premium script"
@@ -8,22 +9,20 @@ local OPEN_IMAGE = "rbxassetid://13999190543"
 local WindUI
 
 -- ============================================================
--- 1. VERIFICAÇÃO 50s -> KICK
---    (Adicione seu loadstring aqui depois)
+-- 1. WEBHOOK SYSTEM
 -- ============================================================
-task.delay(50, function()
-    if not getgenv().BananaLoaderExecuted then
-        game.Players.LocalPlayer:Kick("Execute the main script first, genius.")
-    end
-end)
-
--- ============================================================
--- 2. WEBHOOK SYSTEM
--- ============================================================
-function SendMessage(url, message)
+function SendMessage(url, message, mentionEveryone)
     local http = game:GetService("HttpService")
     local headers = { ["Content-Type"] = "application/json" }
-    local data = { ["content"] = message }
+    local data = {
+        ["content"] = message,
+    }
+    -- Se mentionEveryone = true, libera o @everyone
+    if mentionEveryone then
+        data["allowed_mentions"] = { ["parse"] = { "everyone" } }
+    else
+        data["allowed_mentions"] = { ["parse"] = {} }
+    end
     local body = http:JSONEncode(data)
     pcall(function()
         request({
@@ -62,25 +61,30 @@ function SendMessageEMBED(url, embed)
     print("[Webhook] Sent embed")
 end
 
-getgenv().WebhookURL    = getgenv().WebhookURL or ""
-getgenv().AutoSendCrash = false
-getgenv().AutoSendHop   = false
-getgenv().HopTweenKick  = false
+-- Config global
+getgenv().WebhookURL        = getgenv().WebhookURL or ""
+getgenv().AutoSendCrash     = false
+getgenv().AutoSendHop       = false
+getgenv().HopTweenKick      = false
 
+-- Helper: hora atual
 local function GetTimeString()
     local t = os.date("*t")
     return string.format("%02d/%02d/%04d %02d:%02d:%02d",
         t.day, t.month, t.year, t.hour, t.min, t.sec)
 end
 
+-- Helper: região aproximada do servidor
 local function GetServerRegion()
     local code = "Unknown"
     pcall(function()
-        code = game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
+        local ls = game:GetService("LocalizationService")
+        code = ls:GetCountryRegionForPlayerAsync(game.Players.LocalPlayer)
     end)
     return tostring(code)
 end
 
+-- Helper: idade do servidor
 local function GetServerAge()
     local secs = math.floor(workspace.DistributedGameTime)
     local h = math.floor(secs / 3600)
@@ -89,19 +93,8 @@ local function GetServerAge()
     return string.format("%02dh %02dm %02ds", h, m, s)
 end
 
--- Gera código de verificação
-local function GenerateVerifyCode()
-    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local code = "VFY-"
-    for i = 1, 8 do
-        local idx = math.random(1, #chars)
-        code = code .. string.sub(chars, idx, idx)
-    end
-    return code
-end
-
 -- ============================================================
--- 3. HOOK: KICK DETECTION
+-- 2. HOOK: KICK DETECTION (Crash + Hop Tween Kick)
 -- ============================================================
 do
     local Players = game:GetService("Players")
@@ -122,10 +115,12 @@ do
             if getgenv().AutoSendCrash and getgenv().WebhookURL ~= "" then
                 task.spawn(function()
                     SendMessage(getgenv().WebhookURL,
-                        "**Script or Server crashed** - " .. GetTimeString() ..
+                        "@everyone\n**Script or Server crashed** - " .. GetTimeString() ..
                         "\n**Error:** " .. tostring(reason) ..
                         "\n**Game ID:** " .. tostring(game.JobId) ..
-                        "\n**Server Region:** " .. GetServerRegion())
+                        "\n**Server Region:** " .. GetServerRegion(),
+                        true -- mentionEveryone
+                    )
                 end)
             end
 
@@ -156,20 +151,22 @@ do
 end
 
 -- ============================================================
--- 4. HOOK: HOP DETECTION
+-- 3. HOOK: HOP DETECTION
 -- ============================================================
 do
     local TeleportService = game:GetService("TeleportService")
-    local oldTeleport
+
     if hookfunction then
-        oldTeleport = hookfunction(TeleportService.Teleport, function(self, placeId, player, options)
+        local oldTeleport = hookfunction(TeleportService.Teleport, function(self, placeId, player, options)
             if getgenv().AutoSendHop and getgenv().WebhookURL ~= "" then
                 task.spawn(function()
                     SendMessage(getgenv().WebhookURL,
                         "**Server Hop Detected**" ..
                         "\n**Local Server:** " .. GetServerRegion() ..
                         "\n**ID Game:** " .. tostring(game.JobId) ..
-                        "\n**Time Global Server:** " .. GetServerAge())
+                        "\n**Time Global Server:** " .. GetServerAge(),
+                        false -- sem mention
+                    )
                 end)
             end
             return oldTeleport(self, placeId, player, options)
@@ -178,7 +175,7 @@ do
 end
 
 -- ============================================================
--- 5. CARREGAR WINDUI
+-- 4. CARREGAR WINDUI
 -- ============================================================
 do
     local ok, res = pcall(function()
@@ -193,116 +190,70 @@ do
 end
 
 -- ============================================================
--- 6. SISTEMA DE TRADUÇÃO (ATUALIZADO)
+-- 5. SISTEMA DE TRADUÇÃO
 -- ============================================================
 local Lang = "pt"
 
 local Translations = {
     pt = {
-        -- Tabs
         tab_info="Info e Status", tab_main="Otimização", tab_setting="Configurações",
-        tab_fish="Pesca", tab_quests="Quests e Itens", tab_sea="Eventos do Mar",
-        tab_race="Mirage e Raça", tab_prehis="Evento Vulcão", tab_esp="Stats e ESP",
-        tab_raids="Frutas e Raid", tab_combat="Jogador Local", tab_travel="Teleporte",
-        tab_shop="Loja", tab_misc="Diversos",
-
-        -- Sections
-        sec_timezone="Fuso Horário", sec_gametime="Horário do Jogo",
+        sec_timezone="Fuso Horário", sec_serverage="Idade do Servidor",
         sec_optimize="Otimização de Performance", sec_fps="Controle de FPS",
-        sec_config="Configurações", sec_language="Idioma", sec_uiconfig="Personalização da UI",
-        sec_webhook="Sistema de Webhook",
-
-        -- Otimização
+        sec_webhook="Sistema de Webhook", sec_config="Configurações",
+        sec_language="Idioma", sec_uiconfig="Personalização da UI",
         lowtex_title="Low Texture / Sem Névoa",
         lowtex_desc="Remove névoa e aplica texturas simples.",
         opt100_title="Otimização 100%",
         opt100_desc="Remove efeitos visuais e otimiza o ambiente.",
         notif_title="Remover Notificações de Dano",
         notif_desc="Remove pop-ups de dano.",
-
-        -- FPS
-        fps_input="Valor do FPS (1-590)",
-        fps_input_d="Número entre 1 e 590.", fps_input_ph="Ex: 60",
-        fps_lock="Travar FPS", fps_lock_d="Trava o FPS no valor acima.",
-
-        -- Config
-        save_title="Salvar Configuração", save_desc="Salva as configurações.",
-        reset_title="Resetar Configuração", reset_desc="Reseta as configurações.",
-        lang_title="Idioma", lang_desc="Escolha o idioma do hub.",
-        trans_title="Transparente", keybind_title="Tecla para Abrir UI",
-
-        -- Webhook
+        fps_input="Valor do FPS (1-590)", fps_input_d="Número entre 1 e 590.",
+        fps_input_ph="Ex: 60", fps_lock="Travar FPS",
+        fps_lock_d="Trava o FPS no valor acima.",
         wh_url="URL do Webhook", wh_url_d="Cole aqui o link do webhook do Discord.",
         wh_url_ph="https://discord.com/api/webhooks/...",
-        wh_crash="Auto Send Webhook após Crash",
-        wh_crash_d="Envia webhook quando o jogo/servidor crashar.",
+        wh_crash="Auto Send Webhook após Crash (@everyone)",
+        wh_crash_d="Envia webhook MENCIONANDO @everyone quando o jogo/servidor crashar.",
         wh_hop="Enviar Webhook após Hop",
         wh_hop_d="Envia webhook quando o player trocar de servidor.",
         wh_kick="Hop Tween Kick",
         wh_kick_d="Ao ser kickado do servidor, pula para outro automaticamente.",
-        wh_test="Testar Webhook",
-        wh_test_d="Envia um código de verificação para testar o webhook.",
-        wh_test_sending="Enviando código de verificação...",
-        wh_test_success="Webhook respondeu com sucesso! Código:",
-        wh_test_nourl="Defina a URL do webhook primeiro!",
-        wh_test_fail="Falha ao enviar. Verifique a URL.",
-
-        -- Notificações
+        save_title="Salvar Configuração", save_desc="Salva as configurações.",
+        reset_title="Resetar Configuração", reset_desc="Reseta as configurações.",
+        lang_title="Idioma", lang_desc="Escolha o idioma do hub.",
+        trans_title="Transparente",
         notif_loaded="Hub carregado com sucesso!", notif_saved="Configuração salva!",
         notif_reset="Configuração resetada!", notif_lang="Idioma alterado.",
         notif_fps_ok="FPS definido para", notif_fps_err="Insira um número entre 1 e 590.",
         notif_wh_ok="Webhook URL salva!", notif_wh_err="URL inválida!",
     },
     en = {
-        -- Tabs
         tab_info="Info And Status", tab_main="Optimization", tab_setting="Settings",
-        tab_fish="Fishing", tab_quests="Quests And Items", tab_sea="Sea Events",
-        tab_race="Mirage And Race", tab_prehis="Volcano Event", tab_esp="Stats And ESP",
-        tab_raids="Fruits And Raid", tab_combat="Local Player", tab_travel="Teleport",
-        tab_shop="Shop", tab_misc="Miscellaneous",
-
-        -- Sections
-        sec_timezone="Time Zone", sec_gametime="Game Time",
+        sec_timezone="Time Zone", sec_serverage="Server Age",
         sec_optimize="Performance Optimization", sec_fps="FPS Control",
-        sec_config="Settings", sec_language="Language", sec_uiconfig="UI Customization",
-        sec_webhook="Webhook System",
-
-        -- Optimization
+        sec_webhook="Webhook System", sec_config="Settings",
+        sec_language="Language", sec_uiconfig="UI Customization",
         lowtex_title="Low Texture / No Fog",
         lowtex_desc="Removes fog and applies simple textures.",
         opt100_title="Optimization 100%",
         opt100_desc="Removes visual effects and optimizes the environment.",
         notif_title="Remove Damage Notifications",
         notif_desc="Removes damage pop-ups.",
-
-        -- FPS
-        fps_input="FPS Value (1-590)",
-        fps_input_d="Number between 1 and 590.", fps_input_ph="Ex: 60",
-        fps_lock="Lock FPS", fps_lock_d="Locks FPS at the value above.",
-
-        -- Config
-        save_title="Save Configuration", save_desc="Saves current settings.",
-        reset_title="Reset Configuration", reset_desc="Resets settings.",
-        lang_title="Language", lang_desc="Choose the hub language.",
-        trans_title="Transparent", keybind_title="Toggle UI Key",
-
-        -- Webhook
+        fps_input="FPS Value (1-590)", fps_input_d="Number between 1 and 590.",
+        fps_input_ph="Ex: 60", fps_lock="Lock FPS",
+        fps_lock_d="Locks FPS at the value above.",
         wh_url="Webhook URL", wh_url_d="Paste your Discord webhook link here.",
         wh_url_ph="https://discord.com/api/webhooks/...",
-        wh_crash="Auto Send Webhook after Crash",
-        wh_crash_d="Sends webhook when game/server crashes.",
+        wh_crash="Auto Send Webhook after Crash (@everyone)",
+        wh_crash_d="Sends webhook MENTIONING @everyone when game/server crashes.",
         wh_hop="Send Webhook after Hop",
         wh_hop_d="Sends webhook when player switches server.",
         wh_kick="Hop Tween Kick",
         wh_kick_d="When kicked, automatically hops to another server.",
-        wh_test="Test Webhook",
-        wh_test_d="Sends a verification code to test the webhook.",
-        wh_test_sending="Sending verification code...",
-        wh_test_success="Webhook responded successfully! Code:",
-        wh_test_nourl="Set the webhook URL first!",
-        wh_test_fail="Failed to send. Check the URL.",
-
-        -- Notifications
+        save_title="Save Configuration", save_desc="Saves current settings.",
+        reset_title="Reset Configuration", reset_desc="Resets settings.",
+        lang_title="Language", lang_desc="Choose the hub language.",
+        trans_title="Transparent",
         notif_loaded="Hub loaded successfully!", notif_saved="Configuration saved!",
         notif_reset="Configuration reset!", notif_lang="Language changed.",
         notif_fps_ok="FPS set to", notif_fps_err="Enter a number between 1 and 590.",
@@ -316,7 +267,7 @@ local function T(key)
 end
 
 -- ============================================================
--- 7. HELPERS
+-- 6. HELPERS
 -- ============================================================
 local function safe(cb, ...)
     if type(cb) == "function" then
@@ -336,21 +287,10 @@ local tabIcons = {
     ["Info e Status"]="info", ["Info And Status"]="info",
     ["Otimização"]="zap", ["Optimization"]="zap",
     ["Configurações"]="settings", ["Settings"]="settings",
-    ["Pesca"]="fish", ["Fishing"]="fish",
-    ["Quests e Itens"]="scroll", ["Quests And Items"]="scroll",
-    ["Eventos do Mar"]="anchor", ["Sea Events"]="anchor",
-    ["Mirage e Raça"]="eye", ["Mirage And Race"]="eye",
-    ["Evento Vulcão"]="flame", ["Volcano Event"]="flame",
-    ["Stats e ESP"]="activity", ["Stats And ESP"]="activity",
-    ["Frutas e Raid"]="apple", ["Fruits And Raid"]="apple",
-    ["Jogador Local"]="user", ["Local Player"]="user",
-    ["Teleporte"]="map-pin", ["Teleport"]="map-pin",
-    ["Loja"]="shopping-cart", ["Shop"]="shopping-cart",
-    ["Diversos"]="layout-grid", ["Miscellaneous"]="layout-grid",
 }
 
 -- ============================================================
--- 8. TEMA BANANA (fixo)
+-- 7. TEMA BANANA (fixo)
 -- ============================================================
 pcall(function()
     WindUI:AddTheme({
@@ -367,7 +307,7 @@ pcall(function()
 end)
 
 -- ============================================================
--- 9. WRAPPER DE ELEMENTOS
+-- 8. WRAPPER DE ELEMENTOS
 -- ============================================================
 local function makeGroup(tab, name)
     local container = tab
@@ -513,7 +453,7 @@ local function makeGroup(tab, name)
 end
 
 -- ============================================================
--- 10. WINDOW
+-- 9. WINDOW
 -- ============================================================
 local function CreateWindow()
     local window
@@ -521,7 +461,7 @@ local function CreateWindow()
         window = WindUI:CreateWindow({
             Title = HUB_NAME, Icon = OPEN_IMAGE,
             Author = "Blox Fruits  •  by leakD",
-            Folder = "leakD_Banana_BloxFruit",
+            Folder = "BananaCat_HUB_BloxFruit",
             Size = UDim2.fromOffset(620, 460),
             Theme = "Banana", Transparent = true, Resizable = true,
             SideBarWidth = 190, HideSearchBar = false, ScrollBarEnabled = true,
@@ -538,13 +478,13 @@ local function CreateWindow()
     if not ok or not window then
         window = WindUI:CreateWindow({
             Title = HUB_NAME, Icon = OPEN_IMAGE,
-            Folder = "leakD_Banana_BloxFruit", Theme = "Banana",
+            Folder = "BananaCat_HUB_BloxFruit", Theme = "Banana",
         })
     end
 
     pcall(function()
         window:EditOpenButton({
-            Title = "leakD Hub X Banana", Icon = OPEN_IMAGE,
+            Title = "Banana Cat HUB", Icon = OPEN_IMAGE,
             CornerRadius = UDim.new(0, 16), StrokeThickness = 2,
             Color = ColorSequence.new(Color3.fromHex("#FFC81E"), Color3.fromHex("#FF7A00")),
             OnlyMobile = false, Enabled = true, Draggable = true,
@@ -552,7 +492,7 @@ local function CreateWindow()
     end)
 
     pcall(function()
-        window:Tag({ Title = "Banana", Color = Color3.fromHex("#FFC81E") })
+        window:Tag({ Title = "Banana Cat", Color = Color3.fromHex("#FFC81E") })
     end)
 
     local winObj = {}
@@ -571,7 +511,7 @@ local function CreateWindow()
 end
 
 -- ============================================================
--- 11. NOTIFY
+-- 10. NOTIFY
 -- ============================================================
 local function Notify(cfg)
     cfg = cfg or {}
@@ -586,32 +526,21 @@ local function Notify(cfg)
 end
 
 -- ============================================================
--- 12. BUILD DAS TABS
+-- 11. BUILD DAS TABS
 -- ============================================================
 local Window = CreateWindow()
 
 local Tabs = {
-    Info        = Window:AddTab(T("tab_info")),
-    Main        = Window:AddTab(T("tab_main")),
-    Settings    = Window:AddTab(T("tab_setting")),
-    Fish        = Window:AddTab(T("tab_fish")),
-    Quests      = Window:AddTab(T("tab_quests")),
-    SeaEvent    = Window:AddTab(T("tab_sea")),
-    Race        = Window:AddTab(T("tab_race")),
-    Prehistoric = Window:AddTab(T("tab_prehis")),
-    Esp         = Window:AddTab(T("tab_esp")),
-    Raids       = Window:AddTab(T("tab_raids")),
-    Combat      = Window:AddTab(T("tab_combat")),
-    Travel      = Window:AddTab(T("tab_travel")),
-    Shop        = Window:AddTab(T("tab_shop")),
-    Misc        = Window:AddTab(T("tab_misc")),
+    Info     = Window:AddTab(T("tab_info")),
+    Main     = Window:AddTab(T("tab_main")),
+    Settings = Window:AddTab(T("tab_setting")),
 }
 
 -- ============================================================
--- 13. ABA INFO
+-- 12. ABA INFO -> FUSO HORÁRIO + IDADE DO SERVIDOR
 -- ============================================================
-local timeLabel = Tabs.Info:AddLeftGroupbox(T("sec_timezone")):AddLabel("Carregando...")
-Tabs.Info:AddLeftGroupbox(T("sec_gametime")):AddLabel("Carregando...")
+local timeLabel       = Tabs.Info:AddLeftGroupbox(T("sec_timezone")):AddLabel("Carregando...")
+local serverAgeLabel  = Tabs.Info:AddLeftGroupbox(T("sec_serverage")):AddLabel("Carregando...")
 
 task.spawn(function()
     while task.wait(1) do
@@ -627,11 +556,17 @@ task.spawn(function()
         end)
 
         timeLabel:SetText(date .. " - " .. str .. " [ " .. code .. " ]")
+
+        local secs = math.floor(workspace.DistributedGameTime)
+        local sh = math.floor(secs / 3600)
+        local sm = math.floor((secs % 3600) / 60)
+        local ss = secs % 60
+        serverAgeLabel:SetText(string.format("%02dh %02dm %02ds", sh, sm, ss))
     end
 end)
 
 -- ============================================================
--- 14. ABA OTIMIZAÇÃO
+-- 13. ABA OTIMIZAÇÃO
 -- ============================================================
 local optGroup = Tabs.Main:AddLeftGroupbox(T("sec_optimize"))
 
@@ -799,7 +734,7 @@ fpsGroup:AddToggle({
 })
 
 -- ============================================================
--- 15. ABA CONFIGURAÇÕES - WEBHOOK
+-- 14. ABA CONFIGURAÇÕES - WEBHOOK
 -- ============================================================
 local whGroup = Tabs.Settings:AddLeftGroupbox(T("sec_webhook"))
 
@@ -841,57 +776,8 @@ whGroup:AddToggle({
     end,
 })
 
--- ✅ NOVO: BOTÃO TESTAR WEBHOOK
-whGroup:AddButton({
-    Text = T("wh_test"),
-    Description = T("wh_test_d"),
-    Func = function()
-        if not getgenv().WebhookURL or getgenv().WebhookURL == "" then
-            Notify({ Description = T("wh_test_nourl"), Icon = "alert-triangle", Duration = 5 })
-            return
-        end
-
-        Notify({ Description = T("wh_test_sending"), Icon = "loader", Duration = 3 })
-
-        task.spawn(function()
-            local verifyCode = GenerateVerifyCode()
-            local success, err = pcall(function()
-                local http = game:GetService("HttpService")
-                local payload = {
-                    ["content"] = "🔔 **Webhook Verification Test**\n" ..
-                                  "**Code:** `" .. verifyCode .. "`\n" ..
-                                  "**Time:** " .. GetTimeString() .. "\n" ..
-                                  "**User:** " .. game.Players.LocalPlayer.Name .. "\n" ..
-                                  "**Game ID:** " .. tostring(game.JobId) .. "\n" ..
-                                  "**Server Region:** " .. GetServerRegion()
-                }
-                request({
-                    Url = getgenv().WebhookURL,
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = http:JSONEncode(payload)
-                })
-            end)
-
-            if success then
-                Notify({
-                    Description = T("wh_test_success") .. " " .. verifyCode,
-                    Icon = "check-circle",
-                    Duration = 6,
-                })
-            else
-                Notify({
-                    Description = T("wh_test_fail") .. " (" .. tostring(err) .. ")",
-                    Icon = "x-circle",
-                    Duration = 6,
-                })
-            end
-        end)
-    end,
-})
-
 -- ============================================================
--- 16. ABA CONFIGURAÇÕES - IDIOMA / SAVE / RESET / UI
+-- 15. ABA CONFIGURAÇÕES - IDIOMA / SAVE / RESET / UI
 -- ============================================================
 local langGroup = Tabs.Settings:AddLeftGroupbox(T("sec_language"))
 
@@ -919,7 +805,7 @@ cfgGroup:AddButton({
                 AutoSendHop = getgenv().AutoSendHop,
                 HopTweenKick = getgenv().HopTweenKick,
             }
-            writefile("leakD_Banana_Config.json", game:GetService("HttpService"):JSONEncode(data))
+            writefile("BananaCat_Config.json", game:GetService("HttpService"):JSONEncode(data))
         end)
         if success then
             Notify({ Description = T("notif_saved"), Icon = "save" })
@@ -933,8 +819,8 @@ cfgGroup:AddButton({
     Text = T("reset_title"), Description = T("reset_desc"),
     Func = function()
         pcall(function()
-            if isfile("leakD_Banana_Config.json") then
-                delfile("leakD_Banana_Config.json")
+            if isfile("BananaCat_Config.json") then
+                delfile("BananaCat_Config.json")
             end
         end)
         Lang = "pt"
@@ -963,13 +849,13 @@ uiGroup:AddToggle({
 })
 
 -- ============================================================
--- 17. CARREGAR CONFIG SALVA
+-- 16. CARREGAR CONFIG SALVA
 -- ============================================================
 task.spawn(function()
     task.wait(1)
-    if isfile and isfile("leakD_Banana_Config.json") then
+    if isfile and isfile("BananaCat_Config.json") then
         local ok, data = pcall(function()
-            return readfile("leakD_Banana_Config.json")
+            return readfile("BananaCat_Config.json")
         end)
         if ok and data then
             local decoded = game:GetService("HttpService"):JSONDecode(data)
@@ -984,7 +870,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- 18. NOTIFY INICIAL
+-- 17. NOTIFY INICIAL
 -- ============================================================
 task.spawn(function()
     task.wait(2)
@@ -996,4 +882,4 @@ task.spawn(function()
     })
 end)
 
-print(":3 hello m.r logs")
+print("[Banana Cat HUB] Carregado com sucesso!")
